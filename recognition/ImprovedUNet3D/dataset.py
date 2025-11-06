@@ -41,13 +41,13 @@ def Resize3dTensor(img_tensor, target_shape=(128,128,128), mode_type='trilinear'
     img_tensor: torch tensor of shape (C, D, H, W)
     """
     img_tensor = img_tensor.unsqueeze(0)  # add batch dim
-    img_resized = F.interpolate(img_tensor, size=target_shape, mode=mode_type, align_corners=False)
+    img_resized = F.interpolate(img_tensor, size=target_shape, mode=mode_type)
     return img_resized.squeeze(0)
     
 class HipMriDataset3D(Dataset):
     """Dataset for prostate cancer 3D Images."""
 
-    def __init__(self, image_path, mask_path, transform=None):
+    def __init__(self, image_path, mask_path, transform=None, train=True):
         # Download and load the dataset
         self.image_dataset_path = image_path
         self.mask_dataset_path = mask_path
@@ -58,6 +58,13 @@ class HipMriDataset3D(Dataset):
                         for img_name in sorted(os.listdir(self.image_dataset_path))]
         mask_paths = [os.path.join(self.mask_dataset_path, mask_name)
                        for mask_name in sorted(os.listdir(self.mask_dataset_path))]
+        
+        if train:
+            image_paths = image_paths[:int(0.8*len(image_paths))]
+            mask_paths = mask_paths[:int(0.8*len(mask_paths))]
+        else:
+            image_paths = image_paths[int(0.8*len(image_paths)):]
+            mask_paths = mask_paths[int(0.8*len(mask_paths)):]
         
         for case in range(len(image_paths)):
             self.dataset.append((image_paths[case], mask_paths[case]))
@@ -82,7 +89,7 @@ class HipMriDataset3D(Dataset):
         binary_mask[mask_np == 5] = 1  # prostate voxels
 
         # Convert to tensor
-        binary_mask = torch.from_numpy(binary_mask).unsqueeze(0).int() # add channel dim
+        binary_mask = torch.from_numpy(binary_mask).unsqueeze(0).float() # add channel dim
         image_np = torch.from_numpy(image_np).unsqueeze(0).float() # add channel dim
 
         binary_mask = Resize3dTensor(binary_mask, target_shape=(128,128,128), mode_type='nearest')

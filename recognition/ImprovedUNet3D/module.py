@@ -6,10 +6,10 @@ class Upsample3D(nn.Module):
     def __init__(self, in_channels, scale_factor=2):
         super().__init__()
         self.scale_factor = scale_factor
-        self.conv1 = nn.Conv3d(in_channels, in_channels/2, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv3d(in_channels, in_channels // 2, kernel_size=3, padding=1)
 
     def forward(self, x):
-        x.repeat_interleave(self.scale_factor, dim=2).repeat_interleave(self.scale_factor, dim=3).repeat_interleave(self.scale_factor, dim=4)
+        x = x.repeat_interleave(self.scale_factor, dim=2).repeat_interleave(self.scale_factor, dim=3).repeat_interleave(self.scale_factor, dim=4)
         x = self.conv1(x)
         return x
 
@@ -21,11 +21,17 @@ class ResidualBlock3D(nn.Module):
         super().__init__()
         self.stride = stride
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride)
-        self.norm1 = nn.InstanceNorm3d(out_channels)
+        if (in_channels == 1):
+            self.norm1 = nn.InstanceNorm3d(out_channels)
+        else:
+            self.norm1 = nn.Identity()
         self.act1 = nn.LeakyReLU(0.01)
         
         self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
-        self.norm2 = nn.InstanceNorm3d(out_channels)
+        if (in_channels == 1):
+            self.norm2 = nn.InstanceNorm3d(out_channels)
+        else:
+            self.norm2 = nn.Identity()
         self.act2 = nn.LeakyReLU(0.01)
         
         self.dropout = nn.Dropout3d(dropout)
@@ -50,9 +56,9 @@ class ResidualBlock3D(nn.Module):
 class LocalizationModule(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv3x3 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1)
+        self.conv3x3 = nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1)
         self.act = nn.LeakyReLU(0.01)
-        self.conv1x1 = nn.Conv3d(out_channels, out_channels // 2, kernel_size=1)
+        self.conv1x1 = nn.Conv3d(in_channels, out_channels, kernel_size=1)
     
     def forward(self, x):
         x = self.act(self.conv3x3(x))
@@ -60,17 +66,10 @@ class LocalizationModule(nn.Module):
         return x
 
 # -----------------------------
-# Upsample by voxel repetition
-# -----------------------------
-def upsample_repeat(x):
-    # Double each spatial dimension by repeating voxels
-    return x.repeat_interleave(2, dim=2).repeat_interleave(2, dim=3).repeat_interleave(2, dim=4)
-
-# -----------------------------
 # Full 3D U-Net with deep supervision
 # -----------------------------
 class ImprovedUNet3D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=3, base_filters=16, dropout=0.3):
+    def __init__(self, in_channels=1, base_filters=16, dropout=0.3):
         super().__init__()
         self.upsample1 = Upsample3D(base_filters*16)
         self.upsample2 = Upsample3D(base_filters*8)
@@ -80,22 +79,22 @@ class ImprovedUNet3D(nn.Module):
         self.convInput = nn.Conv3d(in_channels, base_filters, kernel_size=3, padding=1)
         self.convOutput = nn.Conv3d(base_filters*2, base_filters*2, kernel_size=3, padding=1)
 
-        self.StrideConv1 = nn.Conv3d(base_filters*2, base_filters*2, kernel_size=3, padding=1, stride=2)
-        self.StrideConv2 = nn.Conv3d(base_filters*4, base_filters*4, kernel_size=3, padding=1, stride=2)
-        self.StrideConv3 = nn.Conv3d(base_filters*8, base_filters*8, kernel_size=3, padding=1, stride=2)
-        self.StrideConv4 = nn.Conv3d(base_filters*16, base_filters*16, kernel_size=3, padding=1, stride=2)
+        self.StrideConv1 = nn.Conv3d(base_filters, base_filters*2, kernel_size=3, padding=1, stride=2)
+        self.StrideConv2 = nn.Conv3d(base_filters*2, base_filters*4, kernel_size=3, padding=1, stride=2)
+        self.StrideConv3 = nn.Conv3d(base_filters*4, base_filters*8, kernel_size=3, padding=1, stride=2)
+        self.StrideConv4 = nn.Conv3d(base_filters*8, base_filters*16, kernel_size=3, padding=1, stride=2)
 
         # Encoder / context pathway
         self.enc1 = ResidualBlock3D(base_filters, base_filters, dropout) 
-        self.enc2 = ResidualBlock3D(base_filters*2, base_filters*2, dropout, stride=2) 
-        self.enc3 = ResidualBlock3D(base_filters*4, base_filters*4, dropout, stride=2)
-        self.enc4 = ResidualBlock3D(base_filters*8, base_filters*8, dropout, stride=2)
-        self.enc5 = ResidualBlock3D(base_filters*16, base_filters*16, dropout, stride=2)
+        self.enc2 = ResidualBlock3D(base_filters*2, base_filters*2, dropout) 
+        self.enc3 = ResidualBlock3D(base_filters*4, base_filters*4, dropout)
+        self.enc4 = ResidualBlock3D(base_filters*8, base_filters*8, dropout)
+        self.enc5 = ResidualBlock3D(base_filters*16, base_filters*16, dropout)
         
         # Decoder / localization pathway    
-        self.loc3 = LocalizationModule(base_filters*8 + base_filters*8, base_filters*4)
-        self.loc2 = LocalizationModule(base_filters*4 + base_filters*4, base_filters*2)
-        self.loc1 = LocalizationModule(base_filters*2 + base_filters*2, base_filters)
+        self.loc3 = LocalizationModule(base_filters*8 + base_filters*8, base_filters*8)
+        self.loc2 = LocalizationModule(base_filters*4 + base_filters*4, base_filters*4)
+        self.loc1 = LocalizationModule(base_filters*2 + base_filters*2, base_filters*2)
 
         # Segmentation layers
         self.seg1 = nn.Conv3d(base_filters*4, 1, kernel_size=1)
@@ -120,18 +119,18 @@ class ImprovedUNet3D(nn.Module):
         e5 = self.enc5(e5)
 
         u1 = self.upsample1(e5)
-        u1 = torch.concat((u1, e4))
+        u1 = torch.cat((u1, e4), dim=1)
         u1 = self.loc3(u1)
 
         u2 = self.upsample2(u1)
-        u2 = torch.concat(u2, e3)
+        u2 = torch.cat((u2, e3), dim=1)
         u2 = self.loc2(u2)
 
-        res1 = self.seg1(u1)
-        res1 = F.interpolate(res1, size=e1.shape[2:], mode='nearest')
+        res1 = self.seg1(u2)
+        res1 = F.interpolate(res1, size=e2.shape[2:], mode='nearest')
 
         u3 = self.upsample3(u2)
-        u3 = torch.concat(u3, e2)
+        u3 = torch.cat((u3, e2), dim=1)
         u3 = self.loc1(u3)
 
         res2 = self.seg2(u3)
@@ -139,7 +138,7 @@ class ImprovedUNet3D(nn.Module):
         res2 = F.interpolate(res2, size=e1.shape[2:], mode='nearest')
 
         u4 = self.upsample4(u3)     
-        u4 = torch.concat(u4, e1)
+        u4 = torch.cat((u4, e1), dim=1)
 
         out = self.convOutput(u4)
         out = self.seg3(out)
