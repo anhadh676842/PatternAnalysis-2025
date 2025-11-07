@@ -168,7 +168,7 @@ class DiceLoss(nn.Module):
             targets (torch.Tensor): One-hot encoded ground truth [B, C, ...]
         """
         # Ensure floating point
-        predictions = F.softmax(predictions.float())
+        predictions = F.softmax(predictions.float(), dim=1)
         targets = targets.float()
 
         # Flatten across spatial dimensions but keep class and batch
