@@ -43,9 +43,6 @@ def TrainingTransform(image, mask):
     image, mask = RandomRotate_90(image, mask)
     image = zScoreNormalize(image)
 
-    image[mask == 0] = 0
-    image = np.clip(image, -5, 5)
-    image = (image + 5) / 10.0
     return image, mask
 
 def Resize3dTensor(img_tensor, target_shape=(128,128,128), mode_type='trilinear'):

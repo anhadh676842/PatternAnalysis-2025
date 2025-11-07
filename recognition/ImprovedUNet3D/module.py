@@ -144,7 +144,6 @@ class ImprovedUNet3D(nn.Module):
         out = self.convOutput(u4)
         out = self.seg3(out)
         out = res2 + out
-        out = F.softmax(out, dim=1)
         
         return out
     
@@ -169,7 +168,7 @@ class DiceLoss(nn.Module):
             targets (torch.Tensor): One-hot encoded ground truth [B, C, ...]
         """
         # Ensure floating point
-        predictions = predictions.float()
+        predictions = F.softmax(predictions.float())
         targets = targets.float()
 
         # Flatten across spatial dimensions but keep class and batch

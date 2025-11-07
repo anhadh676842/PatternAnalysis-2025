@@ -87,11 +87,12 @@ def train(model, train_loader, test_dataset, epochs=1, lr=0.001):
             # Backward pass
             loss.backward()
             optimizer.step()
-            scheduler.step(loss.detach().item())
+            
 
             epoch_loss += loss.item()
 
         avg_loss = epoch_loss / len(train_loader)
+        scheduler.step(avg_loss)
         losses.append(avg_loss)
         print(f"📈 Epoch {epoch+1}/{epochs} Complete: Avg Loss = {avg_loss:.4f}")
 
