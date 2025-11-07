@@ -21,17 +21,11 @@ class ResidualBlock3D(nn.Module):
         super().__init__()
         self.stride = stride
         self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride)
-        if (in_channels == 1):
-            self.norm1 = nn.InstanceNorm3d(out_channels)
-        else:
-            self.norm1 = nn.Identity()
+        self.norm1 = nn.InstanceNorm3d(out_channels)
         self.act1 = nn.LeakyReLU(0.01)
         
         self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1)
-        if (in_channels == 1):
-            self.norm2 = nn.InstanceNorm3d(out_channels)
-        else:
-            self.norm2 = nn.Identity()
+        self.norm2 = nn.InstanceNorm3d(out_channels)
         self.act2 = nn.LeakyReLU(0.01)
         
         self.dropout = nn.Dropout3d(dropout)
@@ -44,10 +38,12 @@ class ResidualBlock3D(nn.Module):
     def forward(self, x):
         residual = self.skip(x)
         x = self.conv1(x)
+        x = self.norm1(x)
+        x = self.act1(x)
         x = self.dropout(x)
+        x = self.conv2(x)
         x = self.norm2(x)
         x = self.act2(x)
-        x = self.conv2(x)
         return x + residual
 
 # -----------------------------
@@ -69,7 +65,7 @@ class LocalizationModule(nn.Module):
 # Full 3D U-Net with deep supervision
 # -----------------------------
 class ImprovedUNet3D(nn.Module):
-    def __init__(self, in_channels=1, base_filters=16, dropout=0.3):
+    def __init__(self, in_channels=6, base_filters=16, dropout=0.3):
         super().__init__()
         self.upsample1 = Upsample3D(base_filters*16)
         self.upsample2 = Upsample3D(base_filters*8)
@@ -97,9 +93,9 @@ class ImprovedUNet3D(nn.Module):
         self.loc1 = LocalizationModule(base_filters*2 + base_filters*2, base_filters*2)
 
         # Segmentation layers
-        self.seg1 = nn.Conv3d(base_filters*4, 1, kernel_size=1)
-        self.seg2= nn.Conv3d(base_filters*2, 1, kernel_size=1)
-        self.seg3 = nn.Conv3d(base_filters*2, 1, kernel_size=1)
+        self.seg1 = nn.Conv3d(base_filters*4, 6, kernel_size=1)
+        self.seg2= nn.Conv3d(base_filters*2, 6, kernel_size=1)
+        self.seg3 = nn.Conv3d(base_filters*2, 6, kernel_size=1)
     
     def forward(self, x):
         x = self.convInput(x)

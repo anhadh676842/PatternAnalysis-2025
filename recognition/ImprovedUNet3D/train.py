@@ -48,13 +48,14 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         epoch_loss = 0
 
         # Training loop with progress
-        for batch_idx, (images, masks) in enumerate(train_loader):
+        for images, masks in train_loader:
             images, masks = images.to(device), masks.to(device)
 
             optimizer.zero_grad()
             outputs = model(images)
 
             print(f"pred_pet shape: {outputs.shape}, masks shape: {masks.shape}")
+
             loss = criterion(outputs, masks)
 
             # Backward pass
@@ -74,17 +75,12 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         model.eval()
         with torch.no_grad():
             total_dice = 0
-            for i in range(len(test_dataset)):
-                image, mask = test_dataset[i]
-                image = image.unsqueeze(0).to(device)
+            for image, mask in test_dataset:
+                image = image.to(device)
                 mask = mask.to(device)
 
                 output = model(image)
-                pred_mask = (output > 0.5).float()
-
-                intersection = (pred_mask * mask).sum()
-                dice_score = (2.0 * intersection) / (pred_mask.sum() + mask.sum() + 1e-6)
-                total_dice += dice_score.item()
+                total_dice += 1 - criterion(output, mask).item()
 
             avg_dice = total_dice / len(test_dataset)
             print(f"🧪 Validation Dice Score after Epoch {epoch+1}: {avg_dice:.4f}")
@@ -108,4 +104,4 @@ if __name__ == "__main__":
 
     model = ImprovedUNet3D(in_channels=1, base_filters=16, dropout=0.3)
 
-    train(model, train_loader, test_dataset, epochs=50, lr=0.001, visualize_every=5)
+    train(model, train_loader, test_dataset, epochs=50, lr=0.001)

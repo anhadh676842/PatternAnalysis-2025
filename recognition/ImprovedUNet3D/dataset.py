@@ -6,6 +6,14 @@ import numpy as np
 import os
 import nibabel as nib
 
+def to_channels(label_volume, dtype=np.float32):
+    """Convert label map (3D) to one-hot channels (4D)."""
+    num_classes = int(label_volume.max()) + 1
+    out = np.zeros((num_classes,) + label_volume.shape, dtype=dtype)
+    for c in range(num_classes):
+        out[c] = (label_volume == c)
+    return out
+
 def zScoreNormalize(image):
         mean = image.mean()
         std = image.std()
@@ -34,6 +42,10 @@ def TrainingTransform(image, mask):
     image, mask = RandomFlip(image, mask)
     image, mask = RandomRotate_90(image, mask)
     image = zScoreNormalize(image)
+
+    image[mask == 0] = 0
+    image = np.clip(image, -5, 5)
+    image = (image + 5) / 10.0
     return image, mask
 
 def Resize3dTensor(img_tensor, target_shape=(128,128,128), mode_type='trilinear'):
@@ -79,20 +91,18 @@ class HipMriDataset3D(Dataset):
 
         image_np = image.get_fdata().astype(np.float32)
         mask_np = mask.get_fdata().astype(np.uint8)  # convert
-
+        
         # Apply transforms to image
         if self.transform:
             image_np, mask_np = self.transform(image_np, mask_np)
 
-        binary_mask = np.zeros_like(mask_np, dtype=np.uint8)
-        binary_mask[mask_np != 5] = 0  # prostate_voxels
-        binary_mask[mask_np == 5] = 1  # prostate voxels
+        mask_np = to_channels(mask_np, dtype=np.uint8)  # convert to one-hot channels
 
         # Convert to tensor
-        binary_mask = torch.from_numpy(binary_mask).unsqueeze(0).float() # add channel dim
-        image_np = torch.from_numpy(image_np).unsqueeze(0).float() # add channel dim
+        image_np = torch.from_numpy(image_np).unsqueeze(0).float() 
+        mask_np = torch.from_numpy(mask_np).float() 
 
-        binary_mask = Resize3dTensor(binary_mask, target_shape=(128,128,128), mode_type='nearest')
+        mask_np = Resize3dTensor(mask_np, target_shape=(128,128,128), mode_type='nearest')
         image_np = Resize3dTensor(image_np, target_shape=(128,128,128))
 
-        return image_np, binary_mask
+        return image_np, mask_np
