@@ -75,7 +75,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         model.eval()
         with torch.no_grad():
             total_dice = 0
-            for image, mask in test_dataset:
+            for image, mask in test_loader:
                 image = image.to(device)
                 mask = mask.to(device)
 
@@ -95,6 +95,7 @@ if __name__ == "__main__":
                                             mask_path='semantic_labels_anon',
                                             transform=dataset.TrainingTransform,
                                             train=True)
+    
     test_dataset = dataset.HipMriDataset3D(image_path='semantic_MRs_anon',
                                             mask_path='semantic_labels_anon',
                                             train=False)
