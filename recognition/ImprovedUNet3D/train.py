@@ -38,8 +38,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         mode='min',
         factor=0.5,
         patience=5,
-        min_lr=1e-6,
-        verbose=True
+        min_lr=1e-6
     )
 
     losses = []
