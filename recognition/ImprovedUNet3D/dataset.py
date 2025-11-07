@@ -45,6 +45,11 @@ def TrainingTransform(image, mask):
 
     return image, mask
 
+def TestTransform(image, mask):
+    image = zScoreNormalize(image)
+
+    return image, mask
+
 def Resize3dTensor(img_tensor, target_shape=(128,128,128), mode_type='trilinear'):
     """
     img_tensor: torch tensor of shape (C, D, H, W)

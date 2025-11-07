@@ -129,6 +129,7 @@ if __name__ == "__main__":
     
     test_dataset = dataset.HipMriDataset3D(image_path='semantic_MRs_anon',
                                             mask_path='semantic_labels_anon',
+                                            transform=dataset.TestTransform,
                                             train=False)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=2, shuffle=True)
