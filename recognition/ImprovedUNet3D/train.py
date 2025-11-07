@@ -1,5 +1,5 @@
 import dataset
-import matplotlib as plt
+import matplotlib.pyplot  as plt
 import torch
 import torch.optim as optim
 import numpy as np
@@ -35,7 +35,7 @@ def plot_loss(losses, loss_type='dice'):
     plt.grid(True, alpha=0.3)
     plt.show()
 
-def train(model, train_loader, test_dataset, epochs=100, lr=0.001, visualize_every=1):
+def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
     model.to(device)
     criterion = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -70,6 +70,24 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001, visualize_eve
         # Visualize predictions after each epoch (or every few epochs)
         #if (epoch) % visualize_every == 0:
         #    show_epoch_predictions(model, test_dataset, epoch + 1, n=3)
+
+        model.eval()
+        with torch.no_grad():
+            total_dice = 0
+            for i in range(len(test_dataset)):
+                image, mask = test_dataset[i]
+                image = image.unsqueeze(0).to(device)
+                mask = mask.to(device)
+
+                output = model(image)
+                pred_mask = (output > 0.5).float()
+
+                intersection = (pred_mask * mask).sum()
+                dice_score = (2.0 * intersection) / (pred_mask.sum() + mask.sum() + 1e-6)
+                total_dice += dice_score.item()
+
+            avg_dice = total_dice / len(test_dataset)
+            print(f"🧪 Validation Dice Score after Epoch {epoch+1}: {avg_dice:.4f}")
 
     print(" Training complete with enhanced U-Net!")
     plot_loss(losses, loss_type='dice')
