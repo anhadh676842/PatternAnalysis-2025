@@ -13,13 +13,6 @@ import random
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Using device: {device}')
 
-# Set random seeds for reproducibility
-torch.manual_seed(42)
-np.random.seed(42)
-random.seed(42)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(42)
-
 # Quick visualization of loss
 def plot_loss(losses, loss_type='dice'):
     plt.figure(figsize=(8, 4))
@@ -77,10 +70,6 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         avg_loss = epoch_loss / len(train_loader)
         losses.append(avg_loss)
         print(f"📈 Epoch {epoch+1}/{epochs} Complete: Avg Loss = {avg_loss:.4f}")
-
-        # Visualize predictions after each epoch (or every few epochs)
-        #if (epoch) % visualize_every == 0:
-        #    show_epoch_predictions(model, test_dataset, epoch + 1, n=3)
 
         model.eval()
         atThreshold = True
