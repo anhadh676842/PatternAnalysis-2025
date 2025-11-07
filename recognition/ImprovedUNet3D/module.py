@@ -144,13 +144,14 @@ class ImprovedUNet3D(nn.Module):
         return out
     
 class DiceLoss(nn.Module):
-    """Dice Loss for binary segmentation.
+    """
+    Multi-class Dice Loss supporting one-hot encoded targets.
 
-    Dice Loss = 1 - Dice Coefficient
-    Dice Coefficient = (2 * |X ∩ Y|) / (|X| + |Y|)
+    Dice Loss = 1 - (2 * |X ∩ Y| + smooth) / (|X| + |Y| + smooth)
 
-    Args:
-        smooth (float): Smoothing factor to avoid division by zero (default: 1e-6)
+    Works for both 2D and 3D tensors:
+        predictions: [B, C, H, W] or [B, C, D, H, W]
+        targets: same shape (one-hot encoded)
     """
     def __init__(self, smooth=1e-6):
         super(DiceLoss, self).__init__()
@@ -159,16 +160,24 @@ class DiceLoss(nn.Module):
     def forward(self, predictions, targets):
         """
         Args:
-            predictions: Sigmoid output from model [B, H, W] (values between 0-1)
-            targets: Binary ground truth [B, H, W] (values 0 or 1)
+            predictions (torch.Tensor): Model outputs after sigmoid or softmax [B, C, ...]
+            targets (torch.Tensor): One-hot encoded ground truth [B, C, ...]
         """
-        # Flatten tensors using reshape to handle non-contiguous memory layout
-        predictions = predictions.reshape(-1)
-        targets = targets.reshape(-1).float()
+        # Ensure floating point
+        predictions = predictions.float()
+        targets = targets.float()
 
-        # Calculate intersection and union
-        intersection = (predictions * targets).sum()
-        dice_coeff = (2.0 * intersection + self.smooth) / (predictions.sum() + targets.sum() + self.smooth)
+        # Flatten across spatial dimensions but keep class and batch
+        dims = tuple(range(2, predictions.ndim))  # e.g. (2,3,4) for 3D data
 
-        # Return Dice Loss (1 - Dice Coefficient)
-        return 1 - dice_coeff
+        # Compute intersection and union per class
+        intersection = torch.sum(predictions * targets, dims)
+        pred_sum = torch.sum(predictions, dims)
+        target_sum = torch.sum(targets, dims)
+
+        dice_per_class = (2.0 * intersection + self.smooth) / (pred_sum + target_sum + self.smooth)
+
+        # Average over classes and batch
+        dice_loss = 1.0 - dice_per_class.mean()
+
+        return dice_loss

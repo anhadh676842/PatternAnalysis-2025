@@ -2,6 +2,7 @@ import dataset
 import matplotlib.pyplot  as plt
 import torch
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import numpy as np
 import torch.nn.functional as F
 from module import ImprovedUNet3D, DiceLoss
@@ -39,6 +40,14 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
     model.to(device)
     criterion = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=0.5,
+        patience=5,
+        min_lr=1e-6,
+        verbose=True
+    )
 
     losses = []
 
@@ -61,6 +70,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
             # Backward pass
             loss.backward()
             optimizer.step()
+            scheduler.step(loss)
 
             epoch_loss += loss.item()
 
@@ -73,6 +83,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
         #    show_epoch_predictions(model, test_dataset, epoch + 1, n=3)
 
         model.eval()
+        atThreshold = True
         with torch.no_grad():
             total_dice = 0
             for image, mask in test_loader:
@@ -81,9 +92,14 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
 
                 output = model(image)
                 total_dice += 1 - criterion(output, mask).item()
+                if (atThreshold and 1 - criterion(output, mask).item() < 0.7):
+                    atThreshold = False
 
             avg_dice = total_dice / len(test_dataset)
             print(f"🧪 Validation Dice Score after Epoch {epoch+1}: {avg_dice:.4f}")
+
+        if (atThreshold): 
+            break
 
     print(" Training complete with enhanced U-Net!")
     plot_loss(losses, loss_type='dice')
