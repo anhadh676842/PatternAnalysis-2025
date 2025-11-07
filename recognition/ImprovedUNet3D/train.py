@@ -29,7 +29,32 @@ def plot_loss(losses, loss_type='dice'):
     plt.grid(True, alpha=0.3)
     plt.show()
 
-def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualize_cnn_slices(cnn_output, slice_indices=None):
+    """
+    Visualize CNN segmentation slice-by-slice using matplotlib.
+    
+    cnn_output: C x H x W x D (numpy array)
+    slice_indices: list of slice indices along depth (D)
+    """
+    # Convert to label indices
+    label_volume = np.argmax(cnn_output, axis=0)
+    
+    D = label_volume.shape[2]
+    if slice_indices is None:
+        slice_indices = [D // 4, D // 2, 3 * D // 4]
+    
+    fig, axes = plt.subplots(1, len(slice_indices), figsize=(15, 5))
+    
+    for i, idx in enumerate(slice_indices):
+        axes[i].imshow(label_volume[:, :, idx], cmap='tab20')
+        axes[i].set_title(f'Slice {idx}')
+        axes[i].axis('off')
+    plt.show()
+
+def train(model, train_loader, test_dataset, epochs=1, lr=0.001):
     model.to(device)
     criterion = DiceLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -87,6 +112,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
             print(f"🧪 Validation Dice Score after Epoch {epoch+1}: {avg_dice:.4f}")
 
         if (atThreshold): 
+            visualize_cnn_slices(cnn_output=output)
             break
 
     print(" Training complete with enhanced U-Net!")

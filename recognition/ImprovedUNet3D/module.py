@@ -5,11 +5,11 @@ import torch.nn.functional as F
 class Upsample3D(nn.Module):
     def __init__(self, in_channels, scale_factor=2):
         super().__init__()
-        self.scale_factor = scale_factor
+        self.up = nn.Upsample(scale_factor=scale_factor, mode='trilinear', align_corners=True)
         self.conv1 = nn.Conv3d(in_channels, in_channels // 2, kernel_size=3, padding=1)
 
     def forward(self, x):
-        x = x.repeat_interleave(self.scale_factor, dim=2).repeat_interleave(self.scale_factor, dim=3).repeat_interleave(self.scale_factor, dim=4)
+        x = self.up(x)
         x = self.conv1(x)
         return x
 
@@ -43,8 +43,8 @@ class ResidualBlock3D(nn.Module):
         x = self.dropout(x)
         x = self.conv2(x)
         x = self.norm2(x)
-        x = self.act2(x)
-        return x + residual
+        x = x + residual
+        return self.act2(x)
 
 # -----------------------------
 # Localization Module
@@ -79,6 +79,11 @@ class ImprovedUNet3D(nn.Module):
         self.StrideConv2 = nn.Conv3d(base_filters*2, base_filters*4, kernel_size=3, padding=1, stride=2)
         self.StrideConv3 = nn.Conv3d(base_filters*4, base_filters*8, kernel_size=3, padding=1, stride=2)
         self.StrideConv4 = nn.Conv3d(base_filters*8, base_filters*16, kernel_size=3, padding=1, stride=2)
+
+        #self.maxPool1 = nn.MaxPool3d(2)
+        #self.maxPool2 = nn.MaxPool3d(2)
+        #self.maxPool3 = nn.MaxPool3d(2)
+        #self.maxPool4 = nn.MaxPool3d(2)
 
         # Encoder / context pathway
         self.enc1 = ResidualBlock3D(base_filters, base_filters, dropout) 
