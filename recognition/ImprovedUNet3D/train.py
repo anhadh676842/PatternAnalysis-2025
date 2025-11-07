@@ -62,7 +62,7 @@ def train(model, train_loader, test_dataset, epochs=100, lr=0.001):
             # Backward pass
             loss.backward()
             optimizer.step()
-            scheduler.step(loss)
+            scheduler.step(loss.detach().item())
 
             epoch_loss += loss.item()
 
